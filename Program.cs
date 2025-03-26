@@ -1,331 +1,287 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿using System.Text;
 
-class Program
+namespace Homeswork
 {
-    static void Main(string[] args)
+    public enum WarriorType
     {
-        ReadInt();
+        Swordsman,
+        Mage,
+        Knight,
+        Pirate,
+        Dodger
     }
-
-    public static void ReadInt()
+    internal static class Program
     {
-        const string CommandWatchFight = "1";
-        const string CommandExit = "2";
-
-        bool isWork = true;
-
-        Console.WriteLine("Приветствуем на нашей арене!");
-
-        while (isWork)
+        private static void Main()
         {
-            Console.WriteLine($"Меню:\n" +
-                $"\n{CommandWatchFight} - просмотреть бой." +
-                $"\n{CommandExit} - выйти из программы.\n");
+            var warriorsConfigs =
+                new List<(WarriorType type, float health, float defaultDamage)>
+                {
+                    (WarriorType.Swordsman, 100, 25),
+                    (WarriorType.Knight, 110, 20),
+                    (WarriorType.Pirate, 100, 25),
+                    (WarriorType.Mage, 100, 20),
+                    (WarriorType.Dodger, 90, 25),
+                };
 
-            string ?userInput = Console.ReadLine();
+            var warriorsManager = new WarriorsManager();
 
-            switch (userInput)
+            List<DefaultWarrior> availableWarriors = warriorsManager.CreateWarriors(warriorsConfigs);
+
+            var battle = new WarriorsBattle(availableWarriors);
+
+            battle.StartBattle();
+        }
+    }
+    public class WarriorsBattle
+    {
+        private readonly List<DefaultWarrior> _availableWarriors;
+        private readonly DefaultWarrior _firstBattleWarrior;
+        private readonly DefaultWarrior _secondBattleWarrior;
+
+        public WarriorsBattle(List<DefaultWarrior> availableWarriors)
+        {
+            _availableWarriors = availableWarriors;
+
+            Console.WriteLine("          Приветствуем!\n" +
+                              "   Пожалуйста, выберите двух бойцов:\n\n" +
+                              $"{GetAvailableWarriorsString()}");
+
+            (_firstBattleWarrior, _secondBattleWarrior) = SelectWarriors();
+        }
+
+        public void StartBattle()
+        {
+            var battleStage = 1;
+
+            Console.WriteLine("       Да начнётся же бой!");
+
+            while (_firstBattleWarrior.IsAlive && _secondBattleWarrior.IsAlive)
             {
-                case CommandWatchFight:
-                    StartFight();
-                    break;
-
-                case CommandExit:
-                    isWork = false;
-                    break;
-
-                default:
-                    Console.WriteLine("Не верная команда!");
-                    break;
+                Console.WriteLine($"\n    Стадия боя номер {battleStage}:");
+                battleStage++;
+                _firstBattleWarrior.Attack(_secondBattleWarrior);
+                _secondBattleWarrior.Attack(_firstBattleWarrior);
             }
 
-            Console.ReadKey();
-            Console.Clear();
+            ShowBattleResults();
         }
-    }
-    private static void StartFight()
-    {
-        List<Fighter> fighters = new List<Fighter>
+        private void ShowBattleResults()
         {
-            new DoubleDamageFighter("Варвар", 6, 5, 100),
-            new TripleAttackFighter("Берсерк", 8, 3, 100),
-            new FuryFighter("Паладин", 6,2, 100),
-            new FireballFighter("Маг", 12, 4, 100),
-            new DodgeFighter("Каратель", 7, 7, 100)
-        };
-
-        Console.WriteLine("Доступные бойцы:");
-
-        for (int i = 0; i < fighters.Count; i++)
-        {
-            Console.WriteLine($"{i + 1}. {fighters[i].GetInfo()}");
-        }
-
-        Fighter fighter1 = SelectFighter(fighters);
-        Fighter fighter2 = SelectFighter(fighters);
-
-        Fight(fighter1, fighter2);
-    }
-
-    private static Fighter SelectFighter(List<Fighter> fighters)
-    {
-        int fighterIndex = -1;
-
-        while (fighterIndex < 0 || fighterIndex >= fighters.Count)
-        {
-            Console.WriteLine("Выберите бойца. Введите номер: ");
-
-            if(int.TryParse(Console.ReadLine(), out fighterIndex))
+            if (_firstBattleWarrior.IsAlive == false)
             {
-                fighterIndex--; ;
-
-                if(fighterIndex < 0 || fighterIndex > fighters.Count)
+                if (_secondBattleWarrior.IsAlive == false)
                 {
-                    Console.WriteLine("Неверный номер бойца. Пожалуйста попробуйте снова.");
+                    Console.WriteLine("Ничья!");
+                    return;
+                }
+
+                Console.WriteLine($"Победил {_secondBattleWarrior} - у него осталось {_secondBattleWarrior.Health} HP");
+                return;
+            }
+
+            if (_secondBattleWarrior.IsAlive == false)
+            {
+                Console.WriteLine($"Победил {_firstBattleWarrior} - у него осталось {_firstBattleWarrior.Health} HP");
+            }
+        }
+        private string GetAvailableWarriorsString()
+        {
+            var availableWarriors = new StringBuilder();
+            var index = 0;
+
+            foreach (DefaultWarrior warrior in _availableWarriors)
+            {
+                availableWarriors.Append($"          {warrior} - [{++index}]\n");
+            }
+            return availableWarriors.ToString();
+        }
+        private DefaultWarrior GetWarriorFromId(string rawId)
+        {
+            if (uint.TryParse(rawId, out uint id) == false)
+            {
+                throw new ArgumentException("Не удалось получить ID!");
+            }
+
+            id--;
+
+            if (_availableWarriors.Count <= id)
+            {
+                throw new ArgumentException("Такого ID не существует!");
+            }
+
+            return _availableWarriors[(int)id];
+        }
+        private (DefaultWarrior, DefaultWarrior) SelectWarriors()
+        {
+            Console.Write("   Введите ID первого война: ");
+
+            DefaultWarrior firstWarrior = GetWarriorFromId(Console.ReadLine()!);
+
+            Console.Write("   Введите ID второго война: ");
+
+            DefaultWarrior secondWarrior = GetWarriorFromId(Console.ReadLine()!);
+
+            if (firstWarrior == secondWarrior)
+            {
+                secondWarrior = (Activator.CreateInstance(firstWarrior.GetType()) as DefaultWarrior)!;
+            }
+
+            Console.WriteLine("\n        Выбранные классы:\n" +
+                              $"            1 - {firstWarrior}\n" +
+                              $"            2 - {secondWarrior}");
+            return (firstWarrior, secondWarrior);
+        }
+    }
+    public class WarriorsManager
+    {
+        public List<DefaultWarrior> CreateWarriors(List<(WarriorType type, float health, float defaultDamage)> warriorsConfigs)
+        {
+            var createdWarriors = new List<DefaultWarrior>();
+
+            foreach ((WarriorType type, float health, float defaultDamage) in warriorsConfigs)
+            {
+                switch (type)
+                {
+                    case WarriorType.Swordsman:
+                        createdWarriors.Add(new Swordsman(health, defaultDamage));
+                        break;
+                    case WarriorType.Mage:
+                        createdWarriors.Add(new Mage(health, defaultDamage));
+                        break;
+                    case WarriorType.Knight:
+                        createdWarriors.Add(new Knight(health, defaultDamage));
+                        break;
+                    case WarriorType.Pirate:
+                        createdWarriors.Add(new Pirate(health, defaultDamage));
+                        break;
+                    case WarriorType.Dodger:
+                        createdWarriors.Add(new Dodger(health, defaultDamage));
+                        break;
+                    default:
+                        throw new ArgumentException("Неверный тип бойца: " + type);
                 }
             }
-            else
+
+            return createdWarriors;
+        }
+    }
+
+    public abstract class DefaultWarrior
+    {
+        protected DefaultWarrior(float health, float defaultDamage)
+        {
+            Health = health;
+            DefaultDamage = defaultDamage;
+        }
+
+        public abstract string Name { get; }
+        public float Health { get; private set; }
+        public float DefaultDamage { get; private init; }
+        public bool IsAlive => Health > 0;
+        public virtual void Attack(DefaultWarrior enemy) => Attack(enemy, DefaultDamage);
+        public override string ToString() => Name;
+
+        protected virtual void TakeDamage(float damageAmount)
+        {
+            if (damageAmount <= 0)
             {
-                Console.WriteLine("Введите корректное число.");
+                throw new ArgumentOutOfRangeException(nameof(damageAmount), "Значение должно быть больше 0");
             }
+            Health -= damageAmount;
         }
-        return fighters[fighterIndex].Clone();
-    }
 
-    private static void Fight(Fighter fighter1, Fighter fighter2)
-    {
-        Console.WriteLine($"{fighter1.Name} против {fighter2.Name}!");
-
-        while (fighter1.Health > 0 && fighter2.Health > 0)
+        protected virtual void Attack(DefaultWarrior enemy, float damage)
         {
-            fighter1.Attack(fighter2);
+            enemy.TakeDamage(damage);
 
-            if (fighter2.Health > 0)
+            if (enemy.IsAlive == false)
             {
-                fighter2.Attack(fighter1);
+                Console.WriteLine($"{enemy.Name} повержен ударом {Name} силой в {damage} урона!");
+                return;
+            }
+            Console.WriteLine($"{Name} попытался нанести удар по {enemy.Name} - {damage} урона.\n" +
+                              $"У противника осталось {enemy.Health} HP");
+        }
+    }
+
+    public sealed class Swordsman : DefaultWarrior
+    {
+        public Swordsman(float health, float defaultDamage) : base(health, defaultDamage) { }
+
+        public override string Name => "Мечник";
+    }
+
+    public sealed class Mage : DefaultWarrior
+    {
+        private const int _DefaultStrikesToStrongAttack = 3;
+        private const float _StrongAttackDamage = 40f;
+        private int _strikesToStrongAttack = _DefaultStrikesToStrongAttack;
+
+        public Mage(float health, float defaultDamage) : base(health, defaultDamage) { }
+
+        public override string Name => "Маг";
+
+        public override void Attack(DefaultWarrior enemy)
+        {
+            if (_strikesToStrongAttack == 0)
+            {
+                _strikesToStrongAttack = _DefaultStrikesToStrongAttack;
+                Attack(enemy, _StrongAttackDamage);
+                return;
             }
 
-            Console.WriteLine($"{fighter1.Name}: {fighter1.Health} HP, {fighter2.Name}: {fighter2.Health} HP");
-            Console.WriteLine();
+            _strikesToStrongAttack--;
+            base.Attack(enemy);
         }
+    }
 
-        if(fighter1.Health <= 0 && fighter2.Health <= 0)
+    public sealed class Knight : DefaultWarrior
+    {
+        private const float _DamageMultiply = 0.8f;
+
+        public Knight(float health, float defaultDamage) : base(health, defaultDamage) { }
+
+        public override string Name => "Рыцарь";
+        protected override void TakeDamage(float damageAmount) => base.TakeDamage(damageAmount * _DamageMultiply);
+    }
+
+    public sealed class Pirate : DefaultWarrior
+    {
+        private const float _AmountOfAddedMultiplierPerDamage = 0.1f;
+
+        private float _damageMultiplier = 1f;
+
+        public Pirate(float health, float defaultDamage) : base(health, defaultDamage) { }
+
+        public override string Name => "Пират";
+        public override void Attack(DefaultWarrior enemy) => Attack(enemy, DefaultDamage * _damageMultiplier);
+
+        protected override void TakeDamage(float damage)
         {
-            Console.WriteLine("Ничья!");
+            _damageMultiplier += _AmountOfAddedMultiplierPerDamage;
+            base.TakeDamage(damage);
         }
-        else if (fighter1.Health <= 0)
+    }
+
+    public sealed class Dodger : DefaultWarrior
+    {
+        private const int _MaxRandomNumber = 100;
+        private const int _MinRandomNumberForDodge = 80;
+
+        private static readonly Random _random = new();
+
+        public Dodger(float health, float defaultDamage) : base(health, defaultDamage) { }
+
+        public override string Name => "Ловкач";
+        protected override void TakeDamage(float damageAmount)
         {
-            Console.WriteLine($"{fighter2.Name} победил!");
+            if (_random.Next(_MaxRandomNumber) > _MinRandomNumberForDodge)
+            {
+                return;
+            }
+
+            base.TakeDamage(damageAmount);
         }
-        else
-        {
-            Console.WriteLine($"{fighter1.Name} победил!");
-        }
-
-    }
-}
-
-public abstract class Fighter 
-{
-    protected Random random = new Random();
-
-    public Fighter(string name, int damage, int protection, int health)
-    {
-        Name = name;
-        Damage = damage;
-        Protection = protection;
-        Health = health;
-    }
-
-    public string Name { get; private set; }
-    public int Damage { get; private set; }
-    public int Protection { get; private set; }
-    public int Health { get; protected set; }
-
-    public virtual void Attack(Fighter opponent)
-    {
-        int damageDealt = Damage - opponent.Protection;
-
-        if (damageDealt < 0) 
-            damageDealt = 0;
-
-        opponent.TakeDamage(damageDealt);
-
-        Console.WriteLine($"{Name} атакует {opponent.Name} и наносит {damageDealt} урона.");
-    }
-
-    public void TakeDamage(int damage)
-    {
-        Health -= damage;
-
-        if (Health < 0)
-            Health = 0;
-    }
-
-    public virtual string GetInfo()
-    {
-        return $"{Name}. Урон: {Damage}, Защита: {Protection}, Здоровья: {Health}";
-    }
-
-    public abstract Fighter Clone();
-}
-
-public class DoubleDamageFighter : Fighter
-{
-    public DoubleDamageFighter(string name, int damage, int protection, int health)
-        : base(name, damage, protection, health) { }
-
-    public override void Attack(Fighter opponent)
-    {
-        const int MinRandomNumber = 0;
-        const int MaxRandomNumber = 100;
-        const int HitChance = 20;
-
-        int damageDealt = Damage - opponent.Protection;
-
-        if (damageDealt < 0) 
-            damageDealt = 0;
-
-        if (random.Next(MinRandomNumber, MaxRandomNumber) < HitChance)
-        {
-            damageDealt *= 2;
-            Console.WriteLine($"{Name} наносит удвоенный урон!");
-        }
-
-        opponent.TakeDamage(damageDealt);
-        Console.WriteLine($"{Name} атакует {opponent.Name} и наносит {damageDealt} урона.");
-    }
-
-    public override string GetInfo()
-    {
-        return $"{Name}. Урон Варвара : {Damage}, Защита: {Protection}, Здоровья {Health}";
-    }
-    public override Fighter Clone()
-    {
-        return new DoubleDamageFighter(Name, Damage, Protection, Health);
-    }
-}
-
-public class TripleAttackFighter : Fighter
-{
-    private int attackCount = 0;
-
-    public TripleAttackFighter(string name, int damage, int protection, int health)
-        : base(name, damage, protection, health) { }
-
-    public override void Attack(Fighter opponent)
-    {
-        attackCount++;
-        int damageDealt = Damage - opponent.Protection;
-
-        if (damageDealt < 0)
-            damageDealt = 0;
-
-        if (attackCount % 3 == 0)
-        {
-            damageDealt *= 2;
-            Console.WriteLine($"{Name} наносит двойной урон на третьей атаке!");
-        }
-
-        opponent.TakeDamage(damageDealt);
-        Console.WriteLine($"{Name} атакует {opponent.Name} и наносит {damageDealt} урона.");
-    }
-
-    public override Fighter Clone()
-    {
-        return new TripleAttackFighter(Name, Damage, Protection, Health);
-    }
-}
-
-public class FuryFighter : Fighter
-{
-    private int _fury = 0;
-    private const int MaxFury = 10;
-
-    public FuryFighter(string name, int damage, int protection, int health)
-        : base(name, damage, protection, health) { }
-
-    public override void Attack(Fighter opponent)
-    {
-        int damageDealth = Damage - opponent.Protection;
-
-        if (damageDealth < 0) 
-            damageDealth = 0;
-
-        opponent.TakeDamage(damageDealth);
-        _fury += damageDealth;
-        Console.WriteLine($"{Name} атакует {opponent.Name} и наносит {damageDealth} урона. Ярость: {_fury}");
-
-        if (_fury >= MaxFury)
-        {
-            Health += 10;
-            _fury = 0;
-            Console.WriteLine($"{Name} использует лечение!");
-        }
-    }
-    public override Fighter Clone()
-    {
-        return new FuryFighter(Name, Damage, Protection, Health);
-    }
-}
-
-public class FireballFighter : Fighter
-{
-    private int _mana = 20;
-
-    public FireballFighter(string name, int damage, int protection, int health)
-        : base(name, damage, protection, health) { }
-
-    public override void Attack(Fighter opponent)
-    {
-        int damageDealt = Damage - opponent.Protection;
-
-        if (damageDealt < 0)
-            damageDealt = 0;
-
-        if (_mana >= 5)
-        {
-            damageDealt += 5;
-            _mana -= 5;
-            Console.WriteLine($"{Name} использует Оненый шар!");
-        }
-
-        opponent.TakeDamage(damageDealt);
-        Console.WriteLine($"{Name} атакует {opponent.Name} и наносит {damageDealt} урона. Мана: {_mana}");
-    }
-
-    public override Fighter Clone()
-    {
-        return new FireballFighter(Name, Damage, Protection, Health);
-    }
-}
-
-public class DodgeFighter : Fighter
-{
-    public DodgeFighter(string name, int damage, int protection, int health)
-        : base(name, damage, protection, health) { }
-
-    public override void Attack(Fighter opponent)
-    {
-        int damageDealt = Damage - opponent.Protection;
-
-        if (damageDealt < 0) 
-            damageDealt = 0;
-
-        if (random.Next(0, 100) < 30)
-        {
-            Console.WriteLine($"{Name} уклоняется от удара!");
-            return;
-        }
-
-        opponent.TakeDamage(damageDealt);
-        Console.WriteLine($"{Name} атакует {opponent.Name} и наносит {damageDealt} урона.");
-    }
-
-    public override Fighter Clone()
-    {
-        return new DodgeFighter(Name, Damage, Protection, Health);
     }
 }
